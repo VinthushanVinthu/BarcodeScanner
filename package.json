@@ -14,7 +14,8 @@
   },
   "scripts": {
     "dev": "set GENERATE_SOURCEMAP=false&& react-scripts start",
-    "build": "set GENERATE_SOURCEMAP=false&& react-scripts build"
+    "build": "set GENERATE_SOURCEMAP=false&& react-scripts build",
+    "deploy": "npm run build && wrangler pages deploy build --project-name barcodescanner"
   },
   "browserslist": {
     "production": [
