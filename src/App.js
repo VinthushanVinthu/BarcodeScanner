@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import Tesseract from "tesseract.js";
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import {
   Camera,
   Upload,
@@ -17,7 +16,6 @@ import {
   Ruler,
   MapPin,
   BarChart2,
-  Zap,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
@@ -80,47 +78,6 @@ const KNOWN_LABEL_FALLBACKS = [
     },
   },
 ];
-
-const BARCODE_FORMATS = [
-  Html5QrcodeSupportedFormats.CODE_128,
-  Html5QrcodeSupportedFormats.CODE_39,
-  Html5QrcodeSupportedFormats.CODE_93,
-  Html5QrcodeSupportedFormats.ITF,
-  Html5QrcodeSupportedFormats.EAN_13,
-  Html5QrcodeSupportedFormats.EAN_8,
-  Html5QrcodeSupportedFormats.UPC_A,
-  Html5QrcodeSupportedFormats.UPC_E,
-];
-
-const BARCODE_READER_CONFIG = {
-  formatsToSupport: BARCODE_FORMATS,
-  useBarCodeDetectorIfSupported: true,
-  verbose: false,
-};
-
-function createBarcodeReader() {
-  return new Html5Qrcode("hidden-reader", BARCODE_READER_CONFIG);
-}
-
-function clearHiddenReader() {
-  const hiddenEl = document.getElementById("hidden-reader");
-  if (hiddenEl) hiddenEl.innerHTML = "";
-  return hiddenEl;
-}
-
-async function scanBarcodeFile(file) {
-  clearHiddenReader();
-  const qr = createBarcodeReader();
-  try {
-    const result = await qr.scanFileV2(file, false);
-    return result?.decodedText || result?.result?.text || "";
-  } catch {
-    return "";
-  } finally {
-    try { qr.clear(); } catch {}
-    clearHiddenReader();
-  }
-}
 
 async function prepareImageForOcr(blob, crop = null) {
   try {
@@ -358,19 +315,19 @@ function parseText(rawText) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Capture a Blob from a <video> element via canvas
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Result Card
+// ─────────────────────────────────────────────────────────────────────────────
 function captureFrameBlob(videoEl) {
   return new Promise((resolve) => {
     const canvas = document.createElement("canvas");
-    canvas.width  = videoEl.videoWidth  || 1280;
+    canvas.width = videoEl.videoWidth || 1280;
     canvas.height = videoEl.videoHeight || 720;
     canvas.getContext("2d").drawImage(videoEl, 0, 0, canvas.width, canvas.height);
     canvas.toBlob(resolve, "image/jpeg", 0.95);
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Result Card
-// ─────────────────────────────────────────────────────────────────────────────
 function ResultCard({ fieldKey, value }) {
   const meta = FIELD_META[fieldKey];
   if (!meta) return null;
@@ -400,21 +357,24 @@ function App() {
   const [progress,   setProgress]   = useState(0);
   const [error,      setError]      = useState("");
   const [previewUrl, setPreviewUrl] = useState(null);
-  const [mode,       setMode]       = useState("upload");
-
-  // Camera-specific state
-  const [camState,   setCamState]   = useState("idle"); // idle | running | capturing
-  const [scanStatus, setScanStatus] = useState("");     // status text shown in viewfinder
-
-  // Refs
-  const videoRef      = useRef(null);
-  const streamRef     = useRef(null);
-  const scanLoopRef   = useRef(null); // interval ID
-  const capturedOnce  = useRef(false);// prevent double-trigger
-  const qrReaderRef   = useRef(null); // single reusable Html5Qrcode instance
+  const [cameraState, setCameraState] = useState("closed");
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraState("closed");
+  }, []);
+
   const reset = useCallback(() => {
+    stopCamera();
     setRawText("");
     setParsedData({});
     setBarcode("");
@@ -425,134 +385,24 @@ function App() {
       return null;
     });
     setProgress(0);
-    capturedOnce.current = false;
-  }, []);
+  }, [stopCamera]);
 
-  // ── Stop camera stream + loop ────────────────────────────────────────────
-  const stopCamera = useCallback(() => {
-    clearInterval(scanLoopRef.current);
-    scanLoopRef.current = null;
-    // Clean up the shared QR reader instance
-    if (qrReaderRef.current) {
-      try { qrReaderRef.current.clear(); } catch {}
-      qrReaderRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) videoRef.current.srcObject = null;
-    // Clear inner HTML of hidden-reader to reset its state
-    const el = document.getElementById("hidden-reader");
-    if (el) el.innerHTML = "";
-    setCamState("idle");
-    setScanStatus("");
-    capturedOnce.current = false;
-  }, []);
-
-  // ── Run OCR + barcode on a Blob ──────────────────────────────────────────
-  const processBlob = useCallback(async (blob, objectUrl) => {
-    setCamState("capturing");
-    setLoading(true);
-    setScanStatus("Running OCR on captured frame…");
-    if (objectUrl) setPreviewUrl(objectUrl);
-
-    try {
-      // Try barcode decode using a fresh element each time
-      const blobFile = new File([blob], "frame.jpg", { type: "image/jpeg" });
-      const decoded = await scanBarcodeFile(blobFile);
-      if (decoded) setBarcode(decoded);
-
-      // Full label OCR with extra passes over important label zones.
-      const text = await recognizeLabelText(blob, setProgress);
-      const parsed = parseText(text);
-      if (decoded && !parsed.ocrBarcode) parsed.ocrBarcode = decoded;
-      setRawText(text);
-      setParsedData(parsed);
-      setBarcode((current) => current || parsed.ocrBarcode || "");
-    } catch (err) {
-      setError("OCR failed: " + err.message);
-    } finally {
-      setLoading(false);
-      setProgress(0);
-      setScanStatus("");
-      setCamState("idle");
-    }
-  }, []);
-
-  // ── Manual capture button ────────────────────────────────────────────────
-  const captureNow = useCallback(async () => {
-    const video = videoRef.current;
-    if (!video || video.readyState < 2) return;
-    stopCamera();           // stop the scan loop first
-    reset();
-
-    const blob      = await captureFrameBlob(video);
-    const objectUrl = URL.createObjectURL(blob);
-    setMode("upload");      // switch to upload view so preview shows
-    await processBlob(blob, objectUrl);
-  }, [stopCamera, reset, processBlob]);
-
-  // ── Barcode auto-scan loop (runs every 800 ms) ───────────────────────────
-  const startBarcodeLoop = useCallback(() => {
-    if (scanLoopRef.current) return; // already running
-
-    // Create a single reusable barcode reader instance for the loop
-    const hiddenEl = clearHiddenReader();
-    const loopQr = createBarcodeReader();
-    qrReaderRef.current = loopQr;
-
-    const tryBarcode = async () => {
-      const video = videoRef.current;
-      if (!video || video.readyState < 2 || capturedOnce.current) return;
-
-      setScanStatus("Scanning for barcode…");
-      try {
-        const blob     = await captureFrameBlob(video);
-        const blobFile = new File([blob], "frame.jpg", { type: "image/jpeg" });
-        const result = await loopQr.scanFileV2(blobFile, false);
-        const decoded = result?.decodedText || result?.result?.text || "";
-
-        // Barcode found → stop loop, run full OCR
-        if (decoded && !capturedOnce.current) {
-          capturedOnce.current = true;
-          clearInterval(scanLoopRef.current);
-          scanLoopRef.current = null;
-
-          // Clean up loop QR reader before starting processBlob
-          try { loopQr.clear(); } catch {}
-          qrReaderRef.current = null;
-          if (hiddenEl) hiddenEl.innerHTML = "";
-
-          setScanStatus("✅ Barcode detected! Running full OCR…");
-          setBarcode(decoded);
-
-          // Re-capture fresh frame for OCR
-          const freshBlob = await captureFrameBlob(video);
-          stopCamera();
-          const objectUrl = URL.createObjectURL(freshBlob);
-          setMode("upload");
-          await processBlob(freshBlob, objectUrl);
-        }
-      } catch {
-        // No barcode yet — keep scanning
-        setScanStatus("🔍 Point camera at the label barcode…");
-      }
-    };
-
-    scanLoopRef.current = setInterval(tryBarcode, 800);
-  }, [stopCamera, processBlob]);
-
-  // ── Start camera ─────────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
-    setError("");
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError("Camera is not available in this browser.");
+      return;
+    }
+
     reset();
+    setError("");
+    setCameraState("opening");
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: "environment" },
-          width:      { ideal: 1920 },
-          height:     { ideal: 1080 },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
         },
         audio: false,
       });
@@ -561,59 +411,72 @@ function App() {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-      setCamState("running");
-      setScanStatus("🔍 Point camera at the label barcode…");
-      startBarcodeLoop();
+      setCameraState("open");
     } catch (err) {
+      setCameraState("closed");
       setError("Camera error: " + err.message + ". Please allow camera permission.");
     }
-  }, [reset, startBarcodeLoop]);
+  }, [reset]);
 
-  // ── Auto-start camera when switching to camera mode ──────────────────────
-  useEffect(() => {
-    if (mode === "camera") {
-      startCamera();
-    } else {
-      stopCamera();
-    }
-    return () => {
-      if (mode === "camera") stopCamera();
-    };
-  }, [mode]);
-
-  // ── Upload file handler ───────────────────────────────────────────────────
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
+  const processImageFile = useCallback(async (file) => {
     if (!file) return;
+
     reset();
     setLoading(true);
     setPreviewUrl(URL.createObjectURL(file));
 
     try {
-      const decoded = await scanBarcodeFile(file);
-      if (decoded) setBarcode(decoded);
-
       const text = await recognizeLabelText(file, setProgress);
       const parsed = parseText(text);
-      if (decoded && !parsed.ocrBarcode) parsed.ocrBarcode = decoded;
       setRawText(text);
       setParsedData(parsed);
-      setBarcode((current) => current || parsed.ocrBarcode || "");
+      setBarcode(parsed.ocrBarcode || "");
     } catch (err) {
-      setError("Failed to process: " + err.message);
+      setError("Failed to process photo: " + err.message);
     } finally {
       setLoading(false);
       setProgress(0);
     }
+  }, [reset]);
+
+  // ── Upload file handler ───────────────────────────────────────────────────
+  const capturePhoto = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video || video.readyState < 2) return;
+
+    const blob = await captureFrameBlob(video);
+    if (!blob) {
+      setError("Could not capture photo from camera.");
+      return;
+    }
+
+    const file = new File([blob], "label-photo.jpg", { type: "image/jpeg" });
+    await processImageFile(file);
+  }, [processImageFile]);
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    await processImageFile(file);
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file) handleImageUpload({ target: { files: [file] } });
+    if (file) processImageFile(file);
   };
 
   // ── PDF Export ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (cameraState === "closed" || !videoRef.current || !streamRef.current) return;
+    if (videoRef.current.srcObject !== streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [cameraState]);
+
+  useEffect(() => stopCamera, [stopCamera]);
+
   const downloadPDF = () => {
     const doc = new jsPDF();
     doc.setFillColor(79, 70, 229);
@@ -623,13 +486,13 @@ function App() {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(24);
     doc.setFont(undefined, "bold");
-    doc.text("ScanX Pro — Label Report", 14, 22);
+    doc.text("Label Photo Report", 14, 22);
     doc.setFontSize(11);
     doc.setFont(undefined, "normal");
     doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 36);
 
     const rows = [
-      ["Scanner Barcode",   barcode || "—"],
+      ["Barcode from Photo", barcode || "—"],
       ["SEW",               parsedData.sew || "—"],
       ["CUT",               parsedData.cut || "—"],
       ["Sales Order (SO)",  parsedData.so  || "—"],
@@ -667,7 +530,7 @@ function App() {
       doc.setTextColor(100, 100, 100);
       doc.text(doc.splitTextToSize(rawText, 182), 14, finalY + 22);
     }
-    doc.save("ScanX_Label_Report.pdf");
+    doc.save("Label_Photo_Report.pdf");
   };
 
   const hasResults = (rawText || barcode) && !loading;
@@ -677,163 +540,132 @@ function App() {
     <div className="app-shell">
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <header className="hero animate-fade-in">
-        <div className="hero__badge"><Scan size={16} /> AI-Powered</div>
-        <h1 className="gradient-text">ScanX Pro</h1>
-        <p className="hero__sub">Intelligent Label &amp; Barcode Scanner</p>
+        <div className="hero__badge"><Camera size={16} /> AI-Powered</div>
+        <h1 className="gradient-text">Label Photo OCR</h1>
+        <p className="hero__sub">Extract label details from a photo</p>
         <p className="hero__desc">
-          Upload a label image or use Live Camera — barcode is detected automatically and all label fields are extracted instantly.
+          Take a photo or upload an image. The app reads that still photo and extracts the label fields.
         </p>
       </header>
 
-      {/* ── Mode Toggle ──────────────────────────────────────────────────── */}
-      <div className="mode-toggle animate-fade-in" style={{ animationDelay: "0.05s" }}>
-        <button
-          className={`mode-btn ${mode === "upload" ? "active" : ""}`}
-          onClick={() => setMode("upload")}
-          id="btn-mode-upload"
-        >
-          <Upload size={18} /> Upload Photo
-        </button>
-        <button
-          className={`mode-btn ${mode === "camera" ? "active" : ""}`}
-          onClick={() => setMode("camera")}
-          id="btn-mode-camera"
-        >
-          <Camera size={18} /> Live Camera
-        </button>
-      </div>
-
-      {/* ── Main Card ────────────────────────────────────────────────────── */}
-      <div className="glass-card animate-fade-in" style={{ animationDelay: "0.1s" }}>
+      <div className="glass-card animate-fade-in" style={{ animationDelay: "0.05s" }}>
         {error && (
           <div className="alert alert--error">
             <AlertCircle size={18} /> {error}
           </div>
         )}
 
-        {/* ── Upload Mode ──────────────────────────────────────────────── */}
-        {mode === "upload" && (
-          <div
-            className={`drop-zone ${loading ? "drop-zone--loading" : ""}`}
-            onDrop={handleDrop}
-            onDragOver={(e) => e.preventDefault()}
-            onClick={() => !loading && document.getElementById("hidden-file-input").click()}
-            id="drop-zone"
-          >
-            <input
-              id="hidden-file-input"
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              style={{ display: "none" }}
-            />
+        <div
+          className={`drop-zone ${loading ? "drop-zone--loading" : ""}`}
+          onDrop={handleDrop}
+          onDragOver={(e) => e.preventDefault()}
+          id="drop-zone"
+        >
+          <input
+            id="hidden-file-input"
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            style={{ display: "none" }}
+          />
 
-            {loading ? (
-              <div className="loading-state">
-                <div className="spinner-ring" />
-                <p className="loading-state__title">Analysing with AI OCR…</p>
-                <div className="progress-bar">
-                  <div className="progress-bar__fill" style={{ width: `${progress}%` }} />
-                </div>
-                <p className="loading-state__pct">{progress}%</p>
+          {loading ? (
+            <div className="loading-state">
+              <div className="spinner-ring" />
+              <p className="loading-state__title">Reading details from photo...</p>
+              <div className="progress-bar">
+                <div className="progress-bar__fill" style={{ width: `${progress}%` }} />
               </div>
-            ) : previewUrl ? (
-              <div className="preview-wrap">
-                <img src={previewUrl} alt="Scanned label" className="preview-img" />
-                <p className="preview-hint">Click or drop to replace</p>
-              </div>
-            ) : (
-              <div className="drop-zone__idle">
-                <div className="drop-zone__icon"><Upload size={36} /></div>
-                <p className="drop-zone__title">Drop your label image here</p>
-                <p className="drop-zone__sub">or click to browse files</p>
-                <p className="drop-zone__formats">JPG · PNG · WEBP · BMP</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Camera Mode ──────────────────────────────────────────────── */}
-        {mode === "camera" && (
-          <div className="camera-wrap">
-            {/* Viewfinder */}
-            <div className="viewfinder-box">
-              <video
-                ref={videoRef}
-                muted
-                playsInline
-                className="viewfinder-video"
-              />
-
-              {/* Scanning overlay */}
-              {camState === "running" && (
-                <>
-                  <div className="scan-line" />
-                  <div className="scan-corner tl" />
-                  <div className="scan-corner tr" />
-                  <div className="scan-corner bl" />
-                  <div className="scan-corner br" />
-                </>
-              )}
-
-              {/* Status pill */}
-              {scanStatus && (
-                <div className="scan-status-pill">{scanStatus}</div>
-              )}
-
-              {/* Capturing overlay */}
-              {camState === "capturing" && (
-                <div className="capturing-overlay">
-                  <div className="spinner-ring" />
-                  <p>Processing frame…</p>
-                </div>
-              )}
+              <p className="loading-state__pct">{progress}%</p>
             </div>
-
-            {/* Camera Controls */}
-            <div className="camera-controls">
-              {camState === "idle" ? (
+          ) : cameraState !== "closed" ? (
+            <div className="camera-panel">
+              <div className="camera-preview">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="camera-video"
+                />
+                {cameraState === "opening" && (
+                  <div className="camera-overlay">
+                    <div className="spinner-ring" />
+                    <p>Opening camera...</p>
+                  </div>
+                )}
+              </div>
+              <div className="drop-zone__actions">
                 <button
-                  className="btn btn--primary btn--pulse"
-                  onClick={startCamera}
-                  id="btn-start-camera"
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={capturePhoto}
+                  disabled={cameraState !== "open"}
+                  id="btn-capture-photo"
                 >
-                  <Camera size={20} /> Start Camera
+                  <Camera size={18} /> Capture Photo
                 </button>
-              ) : (
-                <>
-                  <button
-                    className="btn btn--outline"
-                    onClick={stopCamera}
-                    id="btn-stop-camera"
-                  >
-                    ✕ Stop Camera
-                  </button>
-                  <button
-                    className="btn btn--primary"
-                    onClick={captureNow}
-                    id="btn-capture-now"
-                    disabled={camState === "capturing"}
-                  >
-                    <Zap size={18} />
-                    {camState === "capturing" ? "Processing…" : "Capture Now"}
-                  </button>
-                </>
-              )}
+                <button
+                  type="button"
+                  className="btn btn--outline"
+                  onClick={stopCamera}
+                  id="btn-cancel-camera"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-
-            <p className="camera-hint">
-              {camState === "running"
-                ? "The barcode is detected automatically — or tap \"Capture Now\" to scan the full label text."
-                : "Camera is stopped. Press Start Camera to begin."}
-            </p>
-          </div>
-        )}
-
-        {/* Hidden div for Html5Qrcode file decoding */}
-        <div id="hidden-reader" style={{ display: "none" }} />
+          ) : previewUrl ? (
+            <div className="preview-wrap">
+              <img src={previewUrl} alt="Selected label" className="preview-img" />
+              <div className="drop-zone__actions">
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={startCamera}
+                  id="btn-take-photo-replace"
+                >
+                  <Camera size={18} /> Take Photo
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--outline"
+                  onClick={() => document.getElementById("hidden-file-input").click()}
+                  id="btn-upload-photo-replace"
+                >
+                  <Upload size={18} /> Upload Photo
+                </button>
+              </div>
+              <p className="preview-hint">Drop another image here to replace this photo</p>
+            </div>
+          ) : (
+            <div className="drop-zone__idle">
+              <div className="drop-zone__icon"><Camera size={36} /></div>
+              <p className="drop-zone__title">Take or upload a label photo</p>
+              <p className="drop-zone__sub">Choose a clear photo and the app will extract the label details from it.</p>
+              <div className="drop-zone__actions">
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={startCamera}
+                  id="btn-take-photo"
+                >
+                  <Camera size={18} /> Take Photo
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--outline"
+                  onClick={() => document.getElementById("hidden-file-input").click()}
+                  id="btn-upload-photo"
+                >
+                  <Upload size={18} /> Upload Photo
+                </button>
+              </div>
+              <p className="drop-zone__formats">JPG / PNG / WEBP / BMP</p>
+            </div>
+          )}
+        </div>
       </div>
-
       {/* ── Results ──────────────────────────────────────────────────────── */}
       {hasResults && (
         <div className="results-section animate-fade-in" style={{ animationDelay: "0.15s" }}>
@@ -841,13 +673,13 @@ function App() {
             <div className="results-header__left">
               <CheckCircle2 color="#4ADE80" size={22} />
               <div>
-                <h2 className="results-header__title">Scan Complete</h2>
+                <h2 className="results-header__title">Photo Processed</h2>
                 <p className="results-header__sub">{parsedCount} fields extracted</p>
               </div>
             </div>
             <div className="results-header__actions">
               <button className="btn btn--ghost" onClick={reset} id="btn-reset">
-                <RefreshCw size={16} /> New Scan
+                <RefreshCw size={16} /> New Photo
               </button>
               <button className="btn btn--green" onClick={downloadPDF} id="btn-download-pdf">
                 <FileDown size={18} /> Download PDF
@@ -859,7 +691,7 @@ function App() {
             <div className="barcode-banner">
               <Scan size={20} />
               <div>
-                <span className="barcode-banner__label">Scanner Barcode</span>
+                <span className="barcode-banner__label">Barcode from Photo</span>
                 <span className="barcode-banner__value">{barcode}</span>
               </div>
             </div>

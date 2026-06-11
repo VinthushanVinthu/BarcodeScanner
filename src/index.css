@@ -147,42 +147,6 @@ body {
 /* ─────────────────────────────────────────────────
    Mode Toggle
 ───────────────────────────────────────────────── */
-.mode-toggle {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  margin-bottom: 24px;
-}
-
-.mode-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 24px;
-  border-radius: var(--radius-md);
-  font-family: inherit;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid var(--border);
-  background: var(--surface-1);
-  color: var(--text-2);
-  transition: all 0.25s ease;
-}
-
-.mode-btn:hover {
-  background: var(--surface-2);
-  border-color: var(--border-hover);
-  color: var(--text-1);
-}
-
-.mode-btn.active {
-  background: linear-gradient(135deg, var(--primary-dark), var(--accent));
-  border-color: transparent;
-  color: #fff;
-  box-shadow: 0 4px 18px rgba(99,102,241,0.4);
-}
-
 /* ─────────────────────────────────────────────────
    Glass Card
 ───────────────────────────────────────────────── */
@@ -208,7 +172,7 @@ body {
   justify-content: center;
   border: 2px dashed var(--border);
   border-radius: var(--radius-lg);
-  cursor: pointer;
+  cursor: default;
   transition: all 0.3s ease;
   background: rgba(99,102,241,0.03);
   position: relative;
@@ -269,9 +233,57 @@ body {
   letter-spacing: 0.05em;
 }
 
+.drop-zone__actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
 /* ─────────────────────────────────────────────────
    Image Preview
 ───────────────────────────────────────────────── */
+.camera-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.camera-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+.camera-video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.camera-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(0,0,0,0.72);
+  color: var(--text-2);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
 .preview-wrap {
   width: 100%;
   display: flex;
@@ -345,118 +357,6 @@ body {
 /* ─────────────────────────────────────────────────
    Camera — Viewfinder
 ───────────────────────────────────────────────── */
-@keyframes scanLine {
-  0%   { top: 10%; }
-  50%  { top: 85%; }
-  100% { top: 10%; }
-}
-
-.camera-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-/* Viewfinder container */
-.viewfinder-box {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  background: #000;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  border: 2px solid rgba(99,102,241,0.4);
-  box-shadow: 0 0 0 1px rgba(99,102,241,0.15), inset 0 0 40px rgba(0,0,0,0.6);
-}
-
-.viewfinder-video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  border-radius: calc(var(--radius-lg) - 2px);
-}
-
-/* Animated scan line */
-.scan-line {
-  position: absolute;
-  left: 8%;
-  right: 8%;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--primary-light), var(--accent), var(--primary-light), transparent);
-  border-radius: 2px;
-  animation: scanLine 2s ease-in-out infinite;
-  box-shadow: 0 0 10px 2px rgba(129,140,248,0.5);
-  pointer-events: none;
-  z-index: 3;
-}
-
-/* Corner brackets */
-.scan-corner {
-  position: absolute;
-  width: 28px;
-  height: 28px;
-  border-color: var(--primary-light);
-  border-style: solid;
-  pointer-events: none;
-  z-index: 4;
-}
-.scan-corner.tl { top: 12px;    left: 12px;   border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
-.scan-corner.tr { top: 12px;    right: 12px;  border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
-.scan-corner.bl { bottom: 12px; left: 12px;   border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
-.scan-corner.br { bottom: 12px; right: 12px;  border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
-
-/* Status pill inside viewfinder */
-.scan-status-pill {
-  position: absolute;
-  bottom: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0,0,0,0.7);
-  backdrop-filter: blur(8px);
-  color: var(--text-2);
-  font-size: 0.82rem;
-  font-weight: 600;
-  padding: 6px 16px;
-  border-radius: 100px;
-  border: 1px solid rgba(255,255,255,0.15);
-  white-space: nowrap;
-  z-index: 5;
-  pointer-events: none;
-}
-
-/* Full-screen capturing overlay */
-.capturing-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.75);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  z-index: 6;
-  color: var(--text-2);
-  font-size: 0.95rem;
-  font-weight: 600;
-  border-radius: calc(var(--radius-lg) - 2px);
-}
-
-.camera-controls {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.camera-hint {
-  text-align: center;
-  font-size: 0.82rem;
-  color: var(--text-3);
-  line-height: 1.5;
-  padding: 0 8px;
-}
-
 /* Disabled button */
 .btn:disabled {
   opacity: 0.5;
@@ -527,10 +427,6 @@ body {
 .btn--outline:hover {
   border-color: var(--border-hover);
   color: var(--text-1);
-}
-
-.btn--pulse {
-  animation: pulse-ring 2.2s infinite;
 }
 
 /* ─────────────────────────────────────────────────
@@ -779,8 +675,6 @@ body {
 ───────────────────────────────────────────────── */
 @media (max-width: 600px) {
   .glass-card, .results-section { padding: 22px 18px; border-radius: var(--radius-lg); }
-  .mode-toggle { gap: 8px; }
-  .mode-btn { padding: 9px 16px; font-size: 0.88rem; }
   .results-header { flex-direction: column; align-items: flex-start; }
   .cards-grid { grid-template-columns: 1fr; }
   .gradient-text { font-size: 2.2rem; }
