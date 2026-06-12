@@ -1,7 +1,7 @@
 import { LogIn, LogOut, Pencil, Plus, RefreshCw, Save, Shield, X } from "lucide-react";
 import Alert from "../components/Alert";
 import { SCAN_TABLE_HEADERS } from "../constants/labelFields";
-import { formatDate } from "../lib/format";
+import { formatDateOnly, getScanDate } from "../lib/format";
 
 export default function AdminView({
   session,
@@ -178,7 +178,7 @@ export default function AdminView({
                 <tbody>
                   {labelScans.map((scan) => (
                     <tr key={scan.id}>
-                      <td>{formatDate(scan.created_at)}</td>
+                      <td>{formatDateOnly(getScanDate(scan))}</td>
                       <td>{scan.section?.name || "-"}</td>
                       <td>{scan.barcode || "-"}</td>
                       <td>{scan.sew || "-"}</td>

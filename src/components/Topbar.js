@@ -1,6 +1,6 @@
-import { ArrowLeft, Scan, Shield } from "lucide-react";
+import { ArrowLeft, FileSpreadsheet, Scan, Shield } from "lucide-react";
 
-export default function Topbar({ view, onHome, onAdmin }) {
+export default function Topbar({ view, onHome, onAdmin, onSummary }) {
   return (
     <header className="topbar">
       <button type="button" className="brand-button" onClick={onHome}>
@@ -13,6 +13,9 @@ export default function Topbar({ view, onHome, onAdmin }) {
             <ArrowLeft size={16} /> Sections
           </button>
         )}
+        <button type="button" className="btn btn--outline" onClick={onSummary}>
+          <FileSpreadsheet size={16} /> Summary
+        </button>
         <button type="button" className="btn btn--outline" onClick={onAdmin}>
           <Shield size={16} /> Admin
         </button>

@@ -24,14 +24,16 @@ export async function fetchAdminSections() {
 export async function fetchLabelScans() {
   return supabase
     .from("label_scans")
-    .select("id,created_at,barcode,sew,cut,so,li,ref,vd,sg3,color,item,size,line_num,bin,section:sections(name)")
+    .select("id,section_id,label_date,created_at,barcode,sew,cut,so,li,ref,vd,sg3,color,item,size,line_num,bin,section:sections(name)")
+    .order("label_date", { ascending: false })
     .order("created_at", { ascending: false })
-    .limit(500);
+    .limit(5000);
 }
 
-export async function saveLabelScan({ selectedSection, barcode, parsedData, rawText }) {
+export async function saveLabelScan({ selectedSection, barcode, parsedData, rawText, scanDate }) {
   const payload = {
     section_id: selectedSection.id,
+    label_date: scanDate || new Date().toISOString().slice(0, 10),
     barcode: barcode || parsedData.ocrBarcode || null,
     sew: parsedData.sew || null,
     cut: parsedData.cut || null,

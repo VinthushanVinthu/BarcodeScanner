@@ -7,6 +7,7 @@ import Topbar from "./components/Topbar";
 import { EMPTY_SECTION_FORM } from "./constants/labelFields";
 import { captureFrameBlob, parseText, recognizeLabelText } from "./lib/ocr";
 import { downloadLabelPdf } from "./lib/pdf";
+import { getTodayInputDate } from "./lib/format";
 import {
   checkIsAdmin,
   fetchActiveSections,
@@ -19,6 +20,7 @@ import { isSupabaseConfigured, supabase } from "./supabaseClient";
 import AdminView from "./views/AdminView";
 import ScannerView from "./views/ScannerView";
 import SectionsView from "./views/SectionsView";
+import SummaryView from "./views/SummaryView";
 
 function App() {
   const [view, setView] = useState("sections");
@@ -32,6 +34,7 @@ function App() {
   const [rawText, setRawText] = useState("");
   const [parsedData, setParsedData] = useState({});
   const [barcode, setBarcode] = useState("");
+  const [scanDate, setScanDate] = useState(getTodayInputDate());
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [scanError, setScanError] = useState("");
@@ -79,6 +82,7 @@ function App() {
     setRawText("");
     setParsedData({});
     setBarcode("");
+    setScanDate(getTodayInputDate());
     setScanError("");
     setSaveState("idle");
     setPreviewUrl((prev) => {
@@ -148,7 +152,7 @@ function App() {
   }, [checkAdmin]);
 
   useEffect(() => {
-    if (view === "admin" && session && isAdmin) {
+    if ((view === "admin" || view === "summary") && session && isAdmin) {
       loadAdminData();
     }
   }, [view, session, isAdmin, loadAdminData]);
@@ -216,6 +220,13 @@ function App() {
     resetScan();
     setSelectedSection(null);
     setView("admin");
+  };
+
+  const openSummary = () => {
+    if (view === "scanner" && !requireScannerExit()) return;
+    resetScan();
+    setSelectedSection(null);
+    setView("summary");
   };
 
   const confirmSection = () => {
@@ -312,7 +323,7 @@ function App() {
     setSaveState("saving");
     setScanError("");
 
-    const { error } = await saveLabelScan({ selectedSection, barcode, parsedData, rawText });
+    const { error } = await saveLabelScan({ selectedSection, barcode, parsedData, rawText, scanDate });
     if (error) {
       setSaveState("idle");
       setScanError("Could not save scan: " + error.message);
@@ -409,7 +420,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Topbar view={view} onHome={goHome} onAdmin={openAdmin} />
+      <Topbar view={view} onHome={goHome} onAdmin={openAdmin} onSummary={openSummary} />
 
       {notice && (
         <Alert type="success">
@@ -446,6 +457,7 @@ function App() {
           barcode={barcode}
           parsedData={parsedData}
           rawText={rawText}
+          scanDate={scanDate}
           saveState={saveState}
           onExit={goHome}
           onDrop={handleDrop}
@@ -455,8 +467,21 @@ function App() {
           onCapturePhoto={capturePhoto}
           onStopCamera={stopCamera}
           onResetScan={resetScan}
+          onScanDateChange={setScanDate}
           onSaveScan={saveScan}
           onDownloadPdf={downloadPDF}
+        />
+      )}
+
+      {view === "summary" && (
+        <SummaryView
+          session={session}
+          isAdmin={isAdmin}
+          adminSections={adminSections}
+          labelScans={labelScans}
+          adminLoading={adminLoading}
+          onRefreshAdmin={loadAdminData}
+          onOpenAdmin={openAdmin}
         />
       )}
 

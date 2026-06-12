@@ -62,3 +62,22 @@ export const SCAN_TABLE_HEADERS = [
   "Line",
   "Bin",
 ];
+
+export const SUMMARY_TABLE_COLUMNS = [
+  { key: "label_date", label: "Label Date" },
+  { key: "created_at", label: "Saved At" },
+  { key: "section", label: "Section" },
+  { key: "barcode", label: "Barcode" },
+  { key: "sew", label: "SEW" },
+  { key: "cut", label: "CUT" },
+  { key: "so", label: "SO" },
+  { key: "li", label: "LI" },
+  { key: "ref", label: "Ref #" },
+  { key: "vd", label: "VD" },
+  { key: "sg3", label: "SG3" },
+  { key: "color", label: "Color / Style" },
+  { key: "item", label: "Item Details" },
+  { key: "size", label: "Size" },
+  { key: "line_num", label: "Line Number" },
+  { key: "bin", label: "Bin / Code" },
+];

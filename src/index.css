@@ -479,6 +479,15 @@ button {
   border-radius: var(--radius);
 }
 
+.scan-date-panel {
+  max-width: 260px;
+  margin-bottom: 18px;
+  padding: 14px;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
 .barcode-banner > div {
   display: grid;
   gap: 2px;
@@ -737,6 +746,44 @@ textarea:focus {
   overflow: hidden;
 }
 
+.summary-filters {
+  display: grid;
+  gap: 18px;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 260px));
+  gap: 14px;
+}
+
+.section-filter {
+  display: grid;
+  gap: 12px;
+}
+
+.section-filter__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.section-checks .checkbox-label {
+  min-height: 38px;
+  padding: 8px 10px;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-weight: 700;
+}
+
 .table-wrap {
   width: 100%;
   overflow: auto;
@@ -749,6 +796,10 @@ table {
   min-width: 1080px;
   border-collapse: collapse;
   background: #ffffff;
+}
+
+.summary-table {
+  min-width: 1600px;
 }
 
 th,
@@ -845,6 +896,10 @@ tr:last-child td {
   }
 
   .admin-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-grid {
     grid-template-columns: 1fr;
   }
 

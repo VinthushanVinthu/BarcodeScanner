@@ -28,6 +28,7 @@ export default function ScannerView({
   barcode,
   parsedData,
   rawText,
+  scanDate,
   saveState,
   onExit,
   onDrop,
@@ -37,6 +38,7 @@ export default function ScannerView({
   onCapturePhoto,
   onStopCamera,
   onResetScan,
+  onScanDateChange,
   onSaveScan,
   onDownloadPdf,
 }) {
@@ -149,6 +151,13 @@ export default function ScannerView({
           </div>
 
           {saveState === "saved" && <Alert type="success">Scan saved.</Alert>}
+
+          <div className="scan-date-panel">
+            <label>
+              Label date
+              <input type="date" value={scanDate} onChange={(event) => onScanDateChange(event.target.value)} disabled={saveState === "saved"} />
+            </label>
+          </div>
 
           {barcode && (
             <div className="barcode-banner">

@@ -24,6 +24,7 @@ create table if not exists public.sections (
 create table if not exists public.label_scans (
   id uuid primary key default gen_random_uuid(),
   section_id uuid not null references public.sections(id) on delete restrict,
+  label_date date not null default current_date,
   barcode text,
   sew text,
   cut text,
@@ -43,11 +44,17 @@ create table if not exists public.label_scans (
   created_at timestamptz not null default now()
 );
 
+alter table public.label_scans
+  add column if not exists label_date date not null default current_date;
+
 create index if not exists idx_sections_active_sort
   on public.sections(is_active, sort_order, name);
 
 create index if not exists idx_label_scans_section_created
   on public.label_scans(section_id, created_at desc);
+
+create index if not exists idx_label_scans_label_date_section
+  on public.label_scans(label_date desc, section_id);
 
 create index if not exists idx_label_scans_barcode
   on public.label_scans(barcode);
