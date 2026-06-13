@@ -29,13 +29,18 @@ export async function fetchSummarySections() {
     .order("name", { ascending: true });
 }
 
-export async function fetchLabelScans() {
-  return supabase
+export async function fetchLabelScans({ fromDate } = {}) {
+  let query = supabase
     .from("label_scans")
     .select("id,section_id,label_date,created_at,barcode,sew,cut,so,li,ref,vd,sg3,color,item,size,line_num,bin,section:sections(name)")
     .order("label_date", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(5000);
+    .order("created_at", { ascending: false });
+
+  if (fromDate) {
+    query = query.gte("label_date", fromDate);
+  }
+
+  return query.limit(5000);
 }
 
 export async function saveLabelScan({ selectedSection, barcode, parsedData, rawText, scanDate }) {

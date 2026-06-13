@@ -7,7 +7,7 @@ import Topbar from "./components/Topbar";
 import { EMPTY_SECTION_FORM } from "./constants/labelFields";
 import { captureFrameBlob, parseText, recognizeLabelText } from "./lib/ocr";
 import { downloadLabelPdf } from "./lib/pdf";
-import { getTodayInputDate } from "./lib/format";
+import { getDateInputDaysAgo, getTodayInputDate } from "./lib/format";
 import {
   checkIsAdmin,
   deleteLabelScan,
@@ -44,6 +44,7 @@ function App() {
   const [scanError, setScanError] = useState("");
   const [previewUrl, setPreviewUrl] = useState(null);
   const [cameraState, setCameraState] = useState("closed");
+  const [cameraFacing, setCameraFacing] = useState("environment");
   const [saveState, setSaveState] = useState("idle");
 
   const [session, setSession] = useState(null);
@@ -70,6 +71,7 @@ function App() {
   const parsedCount = Object.values(parsedData).filter(Boolean).length;
   const hasScannerWork = view === "scanner" && Boolean(loading || rawText || previewUrl || cameraState !== "closed");
   const scannerTitle = selectedSection ? `${selectedSection.name} Section` : "Section Scanner";
+  const summaryStartDate = getDateInputDaysAgo(14);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -139,14 +141,14 @@ function App() {
     setAdminLoading(true);
     setSummaryMessage("");
 
-    const [sectionsResult, scansResult] = await Promise.all([fetchSummarySections(), fetchLabelScans()]);
+    const [sectionsResult, scansResult] = await Promise.all([fetchSummarySections(), fetchLabelScans({ fromDate: summaryStartDate })]);
 
     if (sectionsResult.error) setSummaryMessage(sectionsResult.error.message);
     if (scansResult.error) setSummaryMessage(scansResult.error.message);
     setAdminSections(sectionsResult.data || []);
     setLabelScans(scansResult.data || []);
     setAdminLoading(false);
-  }, []);
+  }, [summaryStartDate]);
 
   useEffect(() => {
     loadSections();
@@ -257,25 +259,37 @@ function App() {
     setView("scanner");
   };
 
-  const startCamera = useCallback(async () => {
+  const openCamera = useCallback(async (nextFacing) => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setScanError("Camera is not available in this browser.");
       return;
     }
 
-    resetScan();
+    stopCamera();
     setScanError("");
     setCameraState("opening");
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-        audio: false,
-      });
+      const baseVideoSettings = {
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+      };
+      const getStream = (facingMode) =>
+        navigator.mediaDevices.getUserMedia({
+          video: {
+            ...baseVideoSettings,
+            facingMode,
+          },
+          audio: false,
+        });
+
+      let stream;
+      try {
+        stream = await getStream({ exact: nextFacing });
+      } catch (_exactFacingError) {
+        stream = await getStream({ ideal: nextFacing });
+      }
+
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -286,7 +300,19 @@ function App() {
       setCameraState("closed");
       setScanError("Camera error: " + err.message + ". Please allow camera permission.");
     }
-  }, [resetScan]);
+  }, [stopCamera]);
+
+  const startCamera = useCallback(async () => {
+    resetScan();
+    await openCamera(cameraFacing);
+  }, [cameraFacing, openCamera, resetScan]);
+
+  const switchCamera = useCallback(async () => {
+    if (cameraState === "opening") return;
+    const nextFacing = cameraFacing === "environment" ? "user" : "environment";
+    setCameraFacing(nextFacing);
+    await openCamera(nextFacing);
+  }, [cameraFacing, cameraState, openCamera]);
 
   const processImageFile = useCallback(
     async (file) => {
@@ -523,6 +549,7 @@ function App() {
           loading={loading}
           progress={progress}
           cameraState={cameraState}
+          cameraFacing={cameraFacing}
           videoRef={videoRef}
           fileInputRef={fileInputRef}
           previewUrl={previewUrl}
@@ -538,6 +565,7 @@ function App() {
           onDragOver={(event) => event.preventDefault()}
           onImageUpload={handleImageUpload}
           onStartCamera={startCamera}
+          onSwitchCamera={switchCamera}
           onCapturePhoto={capturePhoto}
           onStopCamera={stopCamera}
           onResetScan={resetScan}
@@ -553,6 +581,7 @@ function App() {
           labelScans={labelScans}
           adminLoading={adminLoading}
           summaryMessage={summaryMessage}
+          summaryStartDate={summaryStartDate}
           onRefreshSummary={loadSummaryData}
           onSaveScan={saveSummaryScan}
           onDeleteScan={removeSummaryScan}

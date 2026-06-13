@@ -20,6 +20,7 @@ export default function ScannerView({
   loading,
   progress,
   cameraState,
+  cameraFacing,
   videoRef,
   fileInputRef,
   previewUrl,
@@ -35,6 +36,7 @@ export default function ScannerView({
   onDragOver,
   onImageUpload,
   onStartCamera,
+  onSwitchCamera,
   onCapturePhoto,
   onStopCamera,
   onResetScan,
@@ -88,6 +90,9 @@ export default function ScannerView({
               <div className="button-row">
                 <button type="button" className="btn btn--primary" onClick={onCapturePhoto} disabled={cameraState !== "open"}>
                   <Camera size={18} /> Capture Photo
+                </button>
+                <button type="button" className="btn btn--outline" onClick={onSwitchCamera} disabled={cameraState !== "open"}>
+                  <RefreshCw size={18} /> {cameraFacing === "environment" ? "Front Camera" : "Back Camera"}
                 </button>
                 <button type="button" className="btn btn--outline" onClick={onStopCamera}>
                   Cancel

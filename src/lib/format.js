@@ -14,6 +14,13 @@ export function getTodayInputDate() {
   return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10);
 }
 
+export function getDateInputDaysAgo(daysAgo) {
+  const now = new Date();
+  now.setDate(now.getDate() - daysAgo);
+  const offsetMs = now.getTimezoneOffset() * 60 * 1000;
+  return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10);
+}
+
 export function getScanDate(scan) {
   if (scan?.label_date) return scan.label_date;
   if (scan?.created_at) return scan.created_at.slice(0, 10);

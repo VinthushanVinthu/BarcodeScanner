@@ -37,11 +37,12 @@ export default function SummaryView({
   labelScans,
   adminLoading,
   summaryMessage,
+  summaryStartDate,
   onRefreshSummary,
   onSaveScan,
   onDeleteScan,
 }) {
-  const [fromDate, setFromDate] = useState("");
+  const [fromDate, setFromDate] = useState(summaryStartDate);
   const [toDate, setToDate] = useState("");
   const [selectedSections, setSelectedSections] = useState(null); // null means "All sections"
   const [editingScanId, setEditingScanId] = useState(null);
@@ -117,7 +118,7 @@ export default function SummaryView({
     }
 
     if (column.key === "label_date") {
-      return <input type="date" value={scanDraft.label_date} onChange={(event) => updateDraft("label_date", event.target.value)} />;
+      return <input type="date" value={scanDraft.label_date} min={summaryStartDate} onChange={(event) => updateDraft("label_date", event.target.value)} />;
     }
 
     return <input value={scanDraft[column.key] || ""} onChange={(event) => updateDraft(column.key, event.target.value)} />;
@@ -131,7 +132,7 @@ export default function SummaryView({
             <FileSpreadsheet size={16} /> Summary
           </span>
           <h1>Label summary</h1>
-          <p>Filter saved label details by label date and one or more sections.</p>
+          <p>Showing saved label details from the last 2 weeks. Filter by date and section.</p>
         </div>
         <div className="button-row">
           <button type="button" className="btn btn--outline" onClick={onRefreshSummary} disabled={adminLoading}>
@@ -151,11 +152,11 @@ export default function SummaryView({
         <div className="filter-grid">
           <label>
             From date
-            <input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+            <input type="date" value={fromDate} min={summaryStartDate} onChange={(event) => setFromDate(event.target.value)} />
           </label>
           <label>
             To date
-            <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+            <input type="date" value={toDate} min={summaryStartDate} onChange={(event) => setToDate(event.target.value)} />
           </label>
         </div>
 
@@ -191,7 +192,7 @@ export default function SummaryView({
           <div>
             <h2>All label details</h2>
             <p>
-              Showing {filteredScans.length} of {labelScans.length} records
+              Showing {filteredScans.length} of {labelScans.length} records since {formatDateOnly(summaryStartDate)}
             </p>
           </div>
         </div>
@@ -241,7 +242,7 @@ export default function SummaryView({
               ))}
               {!filteredScans.length && (
                 <tr>
-                  <td colSpan={SUMMARY_TABLE_COLUMNS.length + 1}>No labels match the selected filters.</td>
+                  <td colSpan={SUMMARY_TABLE_COLUMNS.length + 1}>No labels match the selected filters from the last 2 weeks.</td>
                 </tr>
               )}
             </tbody>
