@@ -21,6 +21,14 @@ export async function fetchAdminSections() {
     .order("name", { ascending: true });
 }
 
+export async function fetchSummarySections() {
+  return supabase
+    .from("sections")
+    .select("id,name,description,is_active,sort_order")
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+}
+
 export async function fetchLabelScans() {
   return supabase
     .from("label_scans")
@@ -54,6 +62,32 @@ export async function saveLabelScan({ selectedSection, barcode, parsedData, rawT
   return supabase.from("label_scans").insert(payload);
 }
 
+export async function updateLabelScan(scanId, scanForm) {
+  const payload = {
+    section_id: scanForm.section_id,
+    label_date: scanForm.label_date || new Date().toISOString().slice(0, 10),
+    barcode: scanForm.barcode?.trim() || null,
+    sew: scanForm.sew?.trim() || null,
+    cut: scanForm.cut?.trim() || null,
+    so: scanForm.so?.trim() || null,
+    li: scanForm.li?.trim() || null,
+    ref: scanForm.ref?.trim() || null,
+    vd: scanForm.vd?.trim() || null,
+    sg3: scanForm.sg3?.trim() || null,
+    color: scanForm.color?.trim() || null,
+    item: scanForm.item?.trim() || null,
+    size: scanForm.size?.trim() || null,
+    line_num: scanForm.line_num?.trim() || null,
+    bin: scanForm.bin?.trim() || null,
+  };
+
+  return supabase.from("label_scans").update(payload).eq("id", scanId);
+}
+
+export async function deleteLabelScan(scanId) {
+  return supabase.from("label_scans").delete().eq("id", scanId);
+}
+
 export async function upsertSection(sectionForm, editingSectionId) {
   const payload = {
     name: sectionForm.name.trim(),
@@ -67,4 +101,8 @@ export async function upsertSection(sectionForm, editingSectionId) {
   }
 
   return supabase.from("sections").insert(payload);
+}
+
+export async function deleteSection(sectionId) {
+  return supabase.from("sections").delete().eq("id", sectionId);
 }

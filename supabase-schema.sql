@@ -156,7 +156,7 @@ grant usage on schema public to anon, authenticated;
 grant select on public.sections to anon, authenticated;
 grant insert on public.label_scans to anon, authenticated;
 grant select, insert, update, delete on public.sections to authenticated;
-grant select, update, delete on public.label_scans to authenticated;
+grant select, update, delete on public.label_scans to anon, authenticated;
 grant select on public.admin_profiles to authenticated;
 
 drop policy if exists "Admins can view admin profiles" on public.admin_profiles;
@@ -167,11 +167,12 @@ to authenticated
 using (public.is_admin());
 
 drop policy if exists "Anyone can view active sections" on public.sections;
-create policy "Anyone can view active sections"
+drop policy if exists "Anyone can view sections" on public.sections;
+create policy "Anyone can view sections"
 on public.sections
 for select
 to anon, authenticated
-using (is_active = true or public.is_admin());
+using (true);
 
 drop policy if exists "Admins can create sections" on public.sections;
 create policy "Admins can create sections"
@@ -203,26 +204,29 @@ to anon, authenticated
 with check (public.can_insert_label_scan(section_id));
 
 drop policy if exists "Admins can view all scans" on public.label_scans;
-create policy "Admins can view all scans"
+drop policy if exists "Anyone can view all scans" on public.label_scans;
+create policy "Anyone can view all scans"
 on public.label_scans
 for select
-to authenticated
-using (public.is_admin());
+to anon, authenticated
+using (true);
 
 drop policy if exists "Admins can update scans" on public.label_scans;
-create policy "Admins can update scans"
+drop policy if exists "Anyone can update scans" on public.label_scans;
+create policy "Anyone can update scans"
 on public.label_scans
 for update
-to authenticated
-using (public.is_admin())
-with check (public.is_admin());
+to anon, authenticated
+using (true)
+with check (true);
 
 drop policy if exists "Admins can delete scans" on public.label_scans;
-create policy "Admins can delete scans"
+drop policy if exists "Anyone can delete scans" on public.label_scans;
+create policy "Anyone can delete scans"
 on public.label_scans
 for delete
-to authenticated
-using (public.is_admin());
+to anon, authenticated
+using (true);
 
 -- Optional starter section. Delete this block if you want the first admin to create every section manually.
 insert into public.sections (name, description, sort_order)

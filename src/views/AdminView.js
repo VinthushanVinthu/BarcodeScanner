@@ -1,7 +1,5 @@
-import { LogIn, LogOut, Pencil, Plus, RefreshCw, Save, Shield, X } from "lucide-react";
+import { LogIn, LogOut, Pencil, Plus, RefreshCw, Save, Shield, Trash2, X } from "lucide-react";
 import Alert from "../components/Alert";
-import { SCAN_TABLE_HEADERS } from "../constants/labelFields";
-import { formatDateOnly, getScanDate } from "../lib/format";
 
 export default function AdminView({
   session,
@@ -11,7 +9,6 @@ export default function AdminView({
   authLoading,
   authError,
   adminSections,
-  labelScans,
   adminLoading,
   sectionForm,
   editingSectionId,
@@ -23,6 +20,7 @@ export default function AdminView({
   onSectionFormChange,
   onSectionSubmit,
   onEditSection,
+  onDeleteSection,
   onCancelEditSection,
   onRefreshAdmin,
 }) {
@@ -33,8 +31,8 @@ export default function AdminView({
           <span className="eyebrow">
             <Shield size={16} /> Admin
           </span>
-          <h1>Company label database</h1>
-          <p>Manage sections and review every saved label scan.</p>
+          <h1>Section management</h1>
+          <p>Create, edit, and delete sections used by the scanner.</p>
         </div>
         {session && (
           <button type="button" className="btn btn--outline" onClick={onSignOut}>
@@ -149,56 +147,14 @@ export default function AdminView({
                     <button type="button" className="icon-button" onClick={() => onEditSection(section)} aria-label={`Edit ${section.name}`}>
                       <Pencil size={16} />
                     </button>
+                    <button type="button" className="icon-button" onClick={() => onDeleteSection(section)} aria-label={`Delete ${section.name}`}>
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 ))}
                 {!adminSections.length && <div className="empty-state empty-state--small">No sections yet.</div>}
               </div>
             </section>
-          </section>
-
-          <section className="admin-card table-card">
-            <div className="panel-title">
-              <div>
-                <h2>Saved label details</h2>
-                <p>{labelScans.length} latest records</p>
-              </div>
-              <button type="button" className="btn btn--ghost" onClick={onRefreshAdmin}>
-                <RefreshCw size={16} /> Refresh
-              </button>
-            </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    {SCAN_TABLE_HEADERS.map((header) => (
-                      <th key={header}>{header}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {labelScans.map((scan) => (
-                    <tr key={scan.id}>
-                      <td>{formatDateOnly(getScanDate(scan))}</td>
-                      <td>{scan.section?.name || "-"}</td>
-                      <td>{scan.barcode || "-"}</td>
-                      <td>{scan.sew || "-"}</td>
-                      <td>{scan.cut || "-"}</td>
-                      <td>{scan.so || "-"}</td>
-                      <td>{scan.li || "-"}</td>
-                      <td>{scan.item || "-"}</td>
-                      <td>{scan.size || "-"}</td>
-                      <td>{scan.line_num || "-"}</td>
-                      <td>{scan.bin || "-"}</td>
-                    </tr>
-                  ))}
-                  {!labelScans.length && (
-                    <tr>
-                      <td colSpan={SCAN_TABLE_HEADERS.length}>No saved labels yet.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
           </section>
         </>
       )}

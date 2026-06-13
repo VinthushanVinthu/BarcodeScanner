@@ -10,10 +10,14 @@ import { downloadLabelPdf } from "./lib/pdf";
 import { getTodayInputDate } from "./lib/format";
 import {
   checkIsAdmin,
+  deleteLabelScan,
+  deleteSection,
   fetchActiveSections,
   fetchAdminSections,
   fetchLabelScans,
+  fetchSummarySections,
   saveLabelScan,
+  updateLabelScan,
   upsertSection,
 } from "./services/supabaseApi";
 import { isSupabaseConfigured, supabase } from "./supabaseClient";
@@ -55,6 +59,7 @@ function App() {
   const [sectionForm, setSectionForm] = useState(EMPTY_SECTION_FORM);
   const [editingSectionId, setEditingSectionId] = useState(null);
   const [adminMessage, setAdminMessage] = useState("");
+  const [summaryMessage, setSummaryMessage] = useState("");
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -122,10 +127,22 @@ function App() {
     setAdminLoading(true);
     setAdminMessage("");
 
-    const [sectionsResult, scansResult] = await Promise.all([fetchAdminSections(), fetchLabelScans()]);
+    const sectionsResult = await fetchAdminSections();
 
     if (sectionsResult.error) setAdminMessage(sectionsResult.error.message);
-    if (scansResult.error) setAdminMessage(scansResult.error.message);
+    setAdminSections(sectionsResult.data || []);
+    setAdminLoading(false);
+  }, []);
+
+  const loadSummaryData = useCallback(async () => {
+    if (!supabase) return;
+    setAdminLoading(true);
+    setSummaryMessage("");
+
+    const [sectionsResult, scansResult] = await Promise.all([fetchSummarySections(), fetchLabelScans()]);
+
+    if (sectionsResult.error) setSummaryMessage(sectionsResult.error.message);
+    if (scansResult.error) setSummaryMessage(scansResult.error.message);
     setAdminSections(sectionsResult.data || []);
     setLabelScans(scansResult.data || []);
     setAdminLoading(false);
@@ -152,10 +169,13 @@ function App() {
   }, [checkAdmin]);
 
   useEffect(() => {
-    if (view === "admin" || view === "summary") {
+    if (view === "admin") {
       loadAdminData();
     }
-  }, [view, loadAdminData]);
+    if (view === "summary") {
+      loadSummaryData();
+    }
+  }, [view, loadAdminData, loadSummaryData]);
 
   useEffect(() => {
     if (!hasScannerWork) return undefined;
@@ -376,8 +396,12 @@ function App() {
     await supabase.auth.signOut();
     setSession(null);
     setIsAdmin(false);
-    setLabelScans([]);
-    setAdminSections([]);
+    if (view === "summary") {
+      await loadSummaryData();
+    } else {
+      setLabelScans([]);
+      setAdminSections([]);
+    }
   };
 
   const saveSection = async (event) => {
@@ -397,6 +421,56 @@ function App() {
       await loadAdminData();
     }
     setAdminLoading(false);
+  };
+
+  const removeSection = async (section) => {
+    if (!isAdmin) return;
+    const shouldDelete = window.confirm(`Delete ${section.name}? Scans already saved in this section can prevent deletion.`);
+    if (!shouldDelete) return;
+
+    setAdminLoading(true);
+    setAdminMessage("");
+    const { error } = await deleteSection(section.id);
+    if (error) {
+      setAdminMessage(error.message);
+    } else {
+      if (editingSectionId === section.id) cancelEditSection();
+      setAdminMessage("Section deleted.");
+      await loadSections();
+      await loadAdminData();
+    }
+    setAdminLoading(false);
+  };
+
+  const saveSummaryScan = async (scanId, scanForm) => {
+    setAdminLoading(true);
+    setSummaryMessage("");
+    const { error } = await updateLabelScan(scanId, scanForm);
+    if (error) {
+      setSummaryMessage(error.message);
+    } else {
+      setSummaryMessage("Summary row updated.");
+      await loadSummaryData();
+    }
+    setAdminLoading(false);
+    return !error;
+  };
+
+  const removeSummaryScan = async (scan) => {
+    const shouldDelete = window.confirm(`Delete saved label ${scan.barcode || scan.id}?`);
+    if (!shouldDelete) return false;
+
+    setAdminLoading(true);
+    setSummaryMessage("");
+    const { error } = await deleteLabelScan(scan.id);
+    if (error) {
+      setSummaryMessage(error.message);
+    } else {
+      setSummaryMessage("Summary row deleted.");
+      await loadSummaryData();
+    }
+    setAdminLoading(false);
+    return !error;
   };
 
   const editSection = (section) => {
@@ -475,13 +549,13 @@ function App() {
 
       {view === "summary" && (
         <SummaryView
-          session={session}
-          isAdmin={isAdmin}
           adminSections={adminSections}
           labelScans={labelScans}
           adminLoading={adminLoading}
-          onRefreshAdmin={loadAdminData}
-          onOpenAdmin={openAdmin}
+          summaryMessage={summaryMessage}
+          onRefreshSummary={loadSummaryData}
+          onSaveScan={saveSummaryScan}
+          onDeleteScan={removeSummaryScan}
         />
       )}
 
@@ -494,7 +568,6 @@ function App() {
           authLoading={authLoading}
           authError={authError}
           adminSections={adminSections}
-          labelScans={labelScans}
           adminLoading={adminLoading}
           sectionForm={sectionForm}
           editingSectionId={editingSectionId}
@@ -506,6 +579,7 @@ function App() {
           onSectionFormChange={(key, value) => setSectionForm((prev) => ({ ...prev, [key]: value }))}
           onSectionSubmit={saveSection}
           onEditSection={editSection}
+          onDeleteSection={removeSection}
           onCancelEditSection={cancelEditSection}
           onRefreshAdmin={loadAdminData}
         />
