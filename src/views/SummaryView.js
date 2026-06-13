@@ -212,9 +212,11 @@ export default function SummaryView({
               {filteredScans.map((scan) => (
                 <tr key={scan.id}>
                   {SUMMARY_TABLE_COLUMNS.map((column) => (
-                    <td key={column.key}>{renderCell(scan, column)}</td>
+                    <td key={column.key} data-label={column.label}>
+                      {renderCell(scan, column)}
+                    </td>
                   ))}
-                  <td>
+                  <td data-label="Actions">
                     {editingScanId === scan.id ? (
                       <div className="button-row">
                         <button type="button" className="icon-button" onClick={saveEdit} disabled={adminLoading} aria-label="Save row">
