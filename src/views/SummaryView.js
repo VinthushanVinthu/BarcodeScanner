@@ -15,23 +15,34 @@ function getCellValue(scan, key) {
 export default function SummaryView({ session, isAdmin, adminSections, labelScans, adminLoading, onRefreshAdmin, onOpenAdmin }) {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [selectedSectionIds, setSelectedSectionIds] = useState([]);
-
-  const selectedSectionSet = useMemo(() => new Set(selectedSectionIds), [selectedSectionIds]);
-  const allSectionsSelected = selectedSectionIds.length === 0;
+  const [selectedSections, setSelectedSections] = useState(null); // null means "All sections"
 
   const filteredScans = useMemo(() => {
+    const selectedSet = selectedSections ? new Set(selectedSections) : null;
+    
     return labelScans.filter((scan) => {
       const scanDate = getScanDate(scan);
       const matchesFrom = !fromDate || scanDate >= fromDate;
       const matchesTo = !toDate || scanDate <= toDate;
-      const matchesSection = allSectionsSelected || selectedSectionSet.has(scan.section_id);
+      const matchesSection = selectedSet === null || selectedSet.has(scan.section_id);
       return matchesFrom && matchesTo && matchesSection;
     });
-  }, [allSectionsSelected, fromDate, labelScans, selectedSectionSet, toDate]);
+  }, [fromDate, toDate, selectedSections, labelScans]);
 
   const toggleSection = (sectionId) => {
-    setSelectedSectionIds((prev) => (prev.includes(sectionId) ? prev.filter((id) => id !== sectionId) : [...prev, sectionId]));
+    let current = selectedSections === null ? adminSections.map(s => s.id) : selectedSections;
+    
+    if (current.includes(sectionId)) {
+      current = current.filter(id => id !== sectionId);
+    } else {
+      current = [...current, sectionId];
+    }
+    
+    if (current.length === adminSections.length) {
+      setSelectedSections(null);
+    } else {
+      setSelectedSections(current);
+    }
   };
 
   if (!session || !isAdmin) {
@@ -88,18 +99,31 @@ export default function SummaryView({ session, isAdmin, adminSections, labelScan
         <div className="section-filter">
           <div className="section-filter__top">
             <strong>Sections</strong>
-            <button type="button" className="btn btn--ghost" onClick={() => setSelectedSectionIds([])}>
-              Select all
-            </button>
+            <div className="button-row" style={{ gap: '8px' }}>
+              <button type="button" className="btn btn--ghost" onClick={() => setSelectedSections(null)}>
+                Select all
+              </button>
+              <button type="button" className="btn btn--ghost" onClick={() => setSelectedSections([])}>
+                Clear
+              </button>
+            </div>
           </div>
           <div className="section-checks">
             <label className="checkbox-label">
-              <input type="checkbox" checked={allSectionsSelected} onChange={() => setSelectedSectionIds([])} />
+              <input 
+                type="checkbox" 
+                checked={selectedSections === null} 
+                onChange={(e) => setSelectedSections(e.target.checked ? null : [])} 
+              />
               All sections
             </label>
             {adminSections.map((section) => (
               <label className="checkbox-label" key={section.id}>
-                <input type="checkbox" checked={allSectionsSelected || selectedSectionIds.includes(section.id)} onChange={() => toggleSection(section.id)} />
+                <input 
+                  type="checkbox" 
+                  checked={selectedSections === null || selectedSections.includes(section.id)} 
+                  onChange={() => toggleSection(section.id)} 
+                />
                 {section.name}
               </label>
             ))}
