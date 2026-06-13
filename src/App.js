@@ -118,7 +118,7 @@ function App() {
   }, []);
 
   const loadAdminData = useCallback(async () => {
-    if (!supabase || !session || !isAdmin) return;
+    if (!supabase) return;
     setAdminLoading(true);
     setAdminMessage("");
 
@@ -129,7 +129,7 @@ function App() {
     setAdminSections(sectionsResult.data || []);
     setLabelScans(scansResult.data || []);
     setAdminLoading(false);
-  }, [session, isAdmin]);
+  }, []);
 
   useEffect(() => {
     loadSections();
@@ -152,10 +152,10 @@ function App() {
   }, [checkAdmin]);
 
   useEffect(() => {
-    if ((view === "admin" || view === "summary") && session && isAdmin) {
+    if (view === "admin" || view === "summary") {
       loadAdminData();
     }
-  }, [view, session, isAdmin, loadAdminData]);
+  }, [view, loadAdminData]);
 
   useEffect(() => {
     if (!hasScannerWork) return undefined;

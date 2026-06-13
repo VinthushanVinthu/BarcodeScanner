@@ -45,24 +45,7 @@ export default function SummaryView({ session, isAdmin, adminSections, labelScan
     }
   };
 
-  if (!session || !isAdmin) {
-    return (
-      <main className="page-stack">
-        <section className="admin-heading">
-          <div>
-            <span className="eyebrow">
-              <FileSpreadsheet size={16} /> Summary
-            </span>
-            <h1>Label summary</h1>
-            <p>Login as admin to view and download saved label details.</p>
-          </div>
-          <button type="button" className="btn btn--primary" onClick={onOpenAdmin}>
-            Admin Login
-          </button>
-        </section>
-      </main>
-    );
-  }
+
 
   return (
     <main className="page-stack">
