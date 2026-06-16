@@ -1,5 +1,5 @@
 -- Run this file in the Supabase SQL Editor.
--- Default admin signup code: 0773417017
+-- Default admin signup code: 1234
 
 create extension if not exists pgcrypto;
 
@@ -114,7 +114,7 @@ security definer
 set search_path = public, auth
 as $$
 begin
-  if coalesce(new.raw_user_meta_data ->> 'admin_code', '') <> '0773417017' then
+  if coalesce(new.raw_user_meta_data ->> 'admin_code', '') <> '1234' then
     raise exception 'Invalid admin code';
   end if;
 
